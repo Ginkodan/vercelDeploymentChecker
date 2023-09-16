@@ -4,13 +4,14 @@ import "dotenv/config";
 import { postMessageToDiscord } from "./commands/postMessage";
 
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
+const allowedDeployments = process.env.PROJECT_LIST?.split(",") || [];
 
 let processedDeployments = new Set();
 
 const getAllDeployments = async () => {
   try {
     const response = await axios.get(
-      "https://api.vercel.com/v6/deployments?limit=2",
+      "https://api.vercel.com/v6/deployments?limit=10",
       {
         headers: {
           Authorization: `Bearer ${VERCEL_TOKEN}`,
@@ -18,7 +19,9 @@ const getAllDeployments = async () => {
         },
       }
     );
-    return response.data.deployments;
+    return response.data.deployments.filter((deployment: any) =>
+      allowedDeployments.includes(deployment.name)
+    );
   } catch (error) {
     console.error(error);
   }
@@ -52,14 +55,16 @@ const getDeploymentLogs = async (deploymentId: string) => {
         },
       }
     );
-    return response.data.filter((log: any) => log.type === "stdout");
+    return response.data.filter(
+      (log: any) => log.type === "stdout" || log.type === "stderr"
+    );
   } catch (error) {
     console.error(error);
   }
 };
 
 const addAllDeploymentsToSet = async () => {
-  console.log("initializing...");
+  console.log(`initializing for **${allowedDeployments}**`);
   const allDeployments = await getAllDeployments();
   allDeployments.forEach((deployment: any) => {
     processedDeployments.add(deployment.uid);
